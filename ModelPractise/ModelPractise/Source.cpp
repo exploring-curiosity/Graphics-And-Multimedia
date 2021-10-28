@@ -6,6 +6,12 @@ using namespace std;
 vector<vector<GLfloat>> coords(8, vector<GLfloat>(3));
 double alpha=0, beta=0, gamma=0;
 bool flag = true;
+int xwmin = 100, xwmax = 300, ywmin = 100, ywmax = 300;
+pair<int, int> P1, P2;
+int X1, X2, Y1, Y2;
+int stage = 0;
+bool clipped = false;
+
 void init() {
 	glClearColor(1, 1, 1, 1);
 	glMatrixMode(GL_PROJECTION);
@@ -179,6 +185,92 @@ void Axis() {
 	glVertex3f(0, 500, 0);
 	glEnd();
 }
+int getRC(pair<int, int>& P)
+{
+	int rc = 0;
+	if (P.first < xwmin) rc |= 1;
+	else if (P.first > xwmax) rc |= 1 << 1;
+	if (P.second < ywmin) rc |= 1 << 2;
+	else if (P.second > ywmax) rc |= 1 << 3;
+	return rc;
+}
+void findIntersection(pair<int, int>& P, double m, int rc) {
+
+	if (rc == 0) return;
+	// y = ywmax
+	if ((rc >> 3) & 1) {
+		//x =X1 + (y-Y1)/m
+		P.second = ywmax;
+		P.first = X1 + (ywmax - Y1) / m;
+		return;
+	}
+	//y = ywmin
+	if ((rc >> 2) & 1) {
+		//x =X1 + (y-Y1)/m
+		P.second = ywmin;
+		P.first = X1 + (ywmin - Y1) / m;
+		return;
+	}
+	// x= xwmax
+	if ((rc >> 1) & 1) {
+		//y =Y1 + (x-X1)*m
+		P.first = xwmax;
+		P.second = Y1 + (xwmax - X1) * m;
+		return;
+	}
+	// x= xwmin
+	if (rc & 1) {
+		//y =Y1 + (x-X1)*m
+		P.first = xwmin;
+		P.second = Y1 + (xwmin - X1) * m;
+		return;
+	}
+}
+void PerformClipping(pair<int, int>& P1, pair<int, int>& P2,int st)
+{
+	int rc1 = getRC(P1), rc2 = getRC(P2);
+	//Checking for trivial OR
+	if (st == stage) {
+		glBegin(GL_LINES);
+		glVertex2d(P1.first, P1.second);
+		glVertex2d(P2.first, P2.second);
+		glEnd();
+		return;
+	}
+	if (int(rc1 | rc2) == 0) {
+
+		glBegin(GL_LINES);
+		glVertex2d(P1.first, P1.second);
+		glVertex2d(P2.first, P2.second);
+		clipped = true;
+		glEnd();
+		return;
+	}
+	else if (int(rc1 & rc2) != 0) {
+		clipped = true;
+		return;
+	}
+	double m = (Y2 - Y1) * 1.0 / (X2 - X1);
+	findIntersection(P1, m, rc1);
+	findIntersection(P2, m, rc2);
+	PerformClipping(P1, P2,st+1);
+}
+void drawOriginal() {
+	glBegin(GL_LINES);
+	glVertex2d(P1.first, P1.second);
+	glVertex2d(P2.first, P2.second);
+	glEnd();
+}
+
+void drawWindow() {
+	glBegin(GL_LINE_LOOP);
+	glVertex2d(xwmin, ywmin);
+	glVertex2d(xwmax, ywmin);
+	glVertex2d(xwmax, ywmax);
+	glVertex2d(xwmin, ywmax);
+	glEnd();
+}
+
 void display() {
 	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 	glColor3f(1, 0, 0);
@@ -189,6 +281,7 @@ void display() {
 	//Brh(-100, 50, 50, 100);
 	//Brh(-100, -100, 200, 100);
 	//MPCircle(100, 100, 100);
+	/*
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 	if (flag) glOrtho(-500, 500, -500, 500, -500, 500);
@@ -199,10 +292,29 @@ void display() {
 	glRotatef(alpha, 0, 1, 0);
 	glRotatef(beta, 1, 0, 0);
 	glRotatef(gamma, 0, 0, 1);
+	
 	//glTranslatef(-100, 0, 0);
 	//Axis();
-	DrawCube();
+	DrawCube();*/
+	P1 = { X1, Y1 };
+	P2 = { X2,Y2 };
+	glColor3f(0, 1, 0);
+	drawWindow();
+	glColor3f(0, 0, 0);
+	if(stage==0)
+	drawOriginal();
+	glColor3f(1, 0, 0);
+	if(stage>0)
+	PerformClipping(P1, P2,0);
+	
 	glFlush();
+}
+
+void timer(int v) {
+	if (clipped) stage = 0, clipped = false;
+	else stage++;
+	glutPostRedisplay();
+	glutTimerFunc(1000, timer, v);
 }
 
 void keyPress(int key,int x,int y) {
@@ -218,7 +330,7 @@ void keyPress(int key,int x,int y) {
 	glutPostRedisplay();
 }
 
-int main(int argc,char* argv[]) {
+int main(int argc, char* argv[]) {
 	GLfloat x1 = -100, Y1 = -100, z1 = -100, x2 = 100, y2 = 100, z2 = 100;
 	/*cout << "Enter cube dimensions:" << endl;
 	cout << "Enter min x,y,z: ";
@@ -280,11 +392,19 @@ int main(int argc,char* argv[]) {
 	coords[7][1] = Y1;
 	coords[7][2] = z2;
 
+	X1 = 0;
+	Y1 = 0;
+	X2 = 400;
+	Y2 = 500;
+
+	
+
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB | GLUT_DEPTH);
 	glutInitWindowSize(1000, 1000);
 	glutCreateWindow("Model Practise");
 	glutDisplayFunc(display);
+	glutTimerFunc(1000, timer, 0);
 	init3D();
 	glutSpecialFunc(keyPress);
 	glutMainLoop();
