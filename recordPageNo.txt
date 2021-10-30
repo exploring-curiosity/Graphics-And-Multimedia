@@ -1,0 +1,12 @@
+ex1 - pg1
+ex2 - pg12
+ex3 - pg15
+ex4 - pg18
+ex5 - pg21
+ex6 - pg33
+ex7 - pg48
+ex8 - pg52
+ex9 - pg61
+ex10- pg64
+ex11- pg68
+ex12- pg72
